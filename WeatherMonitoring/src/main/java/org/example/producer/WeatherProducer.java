@@ -2,13 +2,13 @@ package org.example.producer;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.example.model.WeatherMessage;
+import org.example.model.WeatherEvent;
 
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
-public class WeatherProducer implements MessageProducer<WeatherMessage>{
-    private final KafkaProducer<String, WeatherMessage> kafkaProducer;
+public class WeatherProducer implements MessageProducer<WeatherEvent>{
+    private final KafkaProducer<String, WeatherEvent> kafkaProducer;
     private final String kafkaTopic;
 
     public WeatherProducer(Properties properties, String topic) {
@@ -16,8 +16,8 @@ public class WeatherProducer implements MessageProducer<WeatherMessage>{
         this.kafkaProducer = new KafkaProducer<>(properties);
     }
     @Override
-    public void send(WeatherMessage message) throws ExecutionException, InterruptedException {
-        ProducerRecord<String, WeatherMessage> record = new ProducerRecord<>(kafkaTopic, message);
+    public void send(WeatherEvent message) throws ExecutionException, InterruptedException {
+        ProducerRecord<String, WeatherEvent> record = new ProducerRecord<>(kafkaTopic, message);
 
         kafkaProducer.send(record, (metadata, exception) ->{
            if(exception != null) {

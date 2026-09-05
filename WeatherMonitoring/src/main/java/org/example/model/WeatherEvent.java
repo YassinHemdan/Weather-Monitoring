@@ -1,13 +1,13 @@
 package org.example.model;
 
-public class WeatherMessage {
+public class WeatherEvent {
     private long station_id;
     private static long s_no = 0;
     private Status battery_status;
     private long status_timestamp;
     private WeatherInfo weather;
 
-    public WeatherMessage(long station_id, WeatherInfo weather, long status_timestamp, Status battery_status) {
+    public WeatherEvent(long station_id, WeatherInfo weather, long status_timestamp, Status battery_status) {
         this.station_id = station_id;
         this.weather = weather;
         this.status_timestamp = status_timestamp;
