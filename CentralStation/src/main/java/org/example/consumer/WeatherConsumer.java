@@ -1,25 +1,59 @@
 package org.example.consumer;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
 import org.example.model.WeatherEvent;
 
-import java.util.List;
+import java.time.Duration;
+import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class WeatherConsumer implements AutoCloseable{
+public class WeatherConsumer implements AutoCloseable {
+
+    private static final Duration POLL_TIMEOUT = Duration.ofMillis(500);
+
     private final KafkaConsumer<String, WeatherEvent> consumer;
+    private final AtomicBoolean running = new AtomicBoolean(true);
 
     public WeatherConsumer(Properties properties, String topic) {
         this.consumer = new KafkaConsumer<>(properties);
-        this.consumer.subscribe(List.of(topic));
+        this.consumer.subscribe(Collections.singletonList(topic));
     }
 
-    public void start(RecordHandler handler) {
-        // TODO: listen to events and pass it to the given handler
+    public void consume(EventHandler handler) {
+
+        try {
+            while (running.get()) {
+
+                ConsumerRecords<String, WeatherEvent> records =
+                        consumer.poll(POLL_TIMEOUT);
+
+                if (records.isEmpty()) {
+                    continue;
+                }
+
+                for (ConsumerRecord<String, WeatherEvent> record : records) {
+                    handler.handle(record);
+                }
+                consumer.commitSync();
+            }
+
+        } catch (WakeupException e) {
+            if (running.get()) {
+                throw e;
+            }
+
+        } finally {
+            consumer.close();
+        }
     }
 
     @Override
-    public void close() throws Exception {
-        this.consumer.close();
+    public void close() {
+        running.set(false);
+        consumer.wakeup();
     }
 }

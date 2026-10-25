@@ -6,7 +6,6 @@ import java.util.Properties;
 
 public class KafkaConfig {
     public static Properties loadProperties() throws IOException {
-
         Properties properties = new Properties();
 
         try (FileInputStream fis =
