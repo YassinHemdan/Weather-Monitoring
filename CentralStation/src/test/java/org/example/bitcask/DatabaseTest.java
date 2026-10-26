@@ -1,5 +1,8 @@
 package org.example.bitcask;
 
+import org.example.adapter.outbound.bitcask.Database;
+import org.example.adapter.outbound.bitcask.Entry;
+import org.example.adapter.outbound.bitcask.Pair;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

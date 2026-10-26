@@ -1,10 +1,10 @@
-package org.example.consumer;
+package org.example.adapter.inbond.kafka.consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.example.model.WeatherEvent;
+import org.example.domain.weather.WeatherEvent;
 
 import java.time.Duration;
 import java.util.Collections;

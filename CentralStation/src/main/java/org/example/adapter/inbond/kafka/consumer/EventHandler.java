@@ -1,7 +1,7 @@
-package org.example.consumer;
+package org.example.adapter.inbond.kafka.consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.example.model.WeatherEvent;
+import org.example.domain.weather.WeatherEvent;
 
 @FunctionalInterface
 public interface EventHandler {

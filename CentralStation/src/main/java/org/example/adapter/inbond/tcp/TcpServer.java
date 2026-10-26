@@ -1,4 +1,4 @@
-package org.example.server;
+package org.example.adapter.inbond.tcp;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

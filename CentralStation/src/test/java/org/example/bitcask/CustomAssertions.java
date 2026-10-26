@@ -1,5 +1,7 @@
 package org.example.bitcask;
 
+import org.example.adapter.outbound.bitcask.Entry;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;

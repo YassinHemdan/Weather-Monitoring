@@ -1,4 +1,4 @@
-package org.example.bitcask;
+package org.example.adapter.outbound.bitcask;
 
 public class Entry {
     private final String key;

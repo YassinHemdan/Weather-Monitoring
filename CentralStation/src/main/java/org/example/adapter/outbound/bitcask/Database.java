@@ -1,4 +1,4 @@
-package org.example.bitcask;
+package org.example.adapter.outbound.bitcask;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;

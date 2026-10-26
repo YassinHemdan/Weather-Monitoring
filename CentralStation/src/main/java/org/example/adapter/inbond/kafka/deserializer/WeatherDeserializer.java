@@ -1,8 +1,8 @@
-package org.example.deserializer;
+package org.example.adapter.inbond.kafka.deserializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
-import org.example.model.WeatherEvent;
+import org.example.domain.weather.WeatherEvent;
 
 public class WeatherDeserializer implements Deserializer<WeatherEvent> {
     private final ObjectMapper objectMapper = new ObjectMapper();
