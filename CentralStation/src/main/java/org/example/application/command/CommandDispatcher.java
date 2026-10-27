@@ -65,6 +65,8 @@ public final class CommandDispatcher {
         CommandHandler oldHandler = registry.get(name);
         if (oldHandler != null)
             throw new IllegalArgumentException("Duplicate command registration: " + name);
+
+        registry.put(name, commandHandler);
     }
     private String normalize(String name) {
         return name.toUpperCase(Locale.ROOT);

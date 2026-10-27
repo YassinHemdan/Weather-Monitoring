@@ -7,6 +7,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.example.application.port.in.IngestWeatherEventUseCase;
 import org.example.domain.weather.WeatherEvent;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -30,7 +31,7 @@ public class WeatherConsumer implements AutoCloseable {
         this.ingestionUseCase = ingestionUseCase;
     }
 
-    public void consume() {
+    public void consume() throws IOException {
 
         try {
             while (running.get()) {

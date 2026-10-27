@@ -15,7 +15,7 @@ public class RespParser {
         respLimits = RespLimits.DEFAULT;
     }
     public RespParser(RespLimits respLimits) {
-        this.respLimits = respLimits;
+        this.respLimits = Objects.requireNonNull(respLimits, "respLimits");
     }
 
     public RespValue parse(InputStream input) throws IOException {

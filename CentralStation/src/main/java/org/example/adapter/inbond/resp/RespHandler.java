@@ -1,50 +1,61 @@
 package org.example.adapter.inbond.resp;
 
 import org.example.adapter.inbond.tcp.TcpServer;
-import org.example.application.command.*;
+import org.example.application.command.Command;
+import org.example.application.command.CommandDispatcher;
+import org.example.application.command.CommandException;
+import org.example.application.command.CommandResult;
+import org.example.application.command.InvalidCommandException;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.util.Objects;
 
 public class RespHandler implements TcpServer.ConnectionHandler {
+    private static final System.Logger LOG =
+            System.getLogger(RespHandler.class.getName());
+
     private final RespParser parser;
     private final RespWriter writer;
     private final RespCommandDecoder decoder;
     private final CommandDispatcher dispatcher;
 
     public RespHandler(CommandDispatcher dispatcher) {
-        this(new RespParser(), new RespCommandDecoder(), dispatcher,
-                new RespWriter());
+        this(new RespParser(), new RespCommandDecoder(), dispatcher, new RespWriter());
     }
 
-    public RespHandler(RespParser parser,
-                       RespCommandDecoder decoder,
-                       CommandDispatcher dispatcher,
-                       RespWriter writer) {
+    public RespHandler(
+            RespParser parser,
+            RespCommandDecoder decoder,
+            CommandDispatcher dispatcher,
+            RespWriter writer) {
         this.parser = Objects.requireNonNull(parser, "parser");
         this.decoder = Objects.requireNonNull(decoder, "decoder");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.writer = Objects.requireNonNull(writer, "writer");
     }
 
-
     @Override
     public void handle(Socket socket) throws IOException {
-        Objects.requireNonNull(socket);
+        Objects.requireNonNull(socket, "socket");
 
-        InputStream inputStream = new BufferedInputStream(socket.getInputStream());
-        OutputStream outputStream = new BufferedOutputStream(socket.getOutputStream());
+        InputStream input = new BufferedInputStream(socket.getInputStream());
+        OutputStream output = new BufferedOutputStream(socket.getOutputStream());
 
-        while(!socket.isClosed()) {
+        while (!socket.isClosed()) {
             RespValue request;
             try {
-                request = parser.parse(inputStream);
+                request = parser.parse(input);
             } catch (EOFException e) {
-                writer.writeError("Protocol error: incomplete RESP request", outputStream);
+                writer.writeError("Protocol error: incomplete RESP request", output);
                 return;
             } catch (RespProtocolException e) {
-                writer.writeError("Protocol error: " + e.getMessage(), outputStream);
+                writer.writeError("Protocol error: " + e.getMessage(), output);
                 return;
             }
 
@@ -52,13 +63,28 @@ public class RespHandler implements TcpServer.ConnectionHandler {
                 return;
             }
 
+            Command command;
             try {
-                Command command = decoder.decode(request);
-                CommandResult result = dispatcher.dispatch(command);
-                writer.writeResult(result, outputStream);
-            } catch (InvalidCommandException | CommandException e) {
-                writer.writeError(e.getMessage(), outputStream);
+                command = decoder.decode(request);
+            } catch (InvalidCommandException e) {
+                writer.writeError(e.getMessage(), output);
+                continue;
             }
+
+            CommandResult result;
+            try {
+                result = dispatcher.dispatch(command);
+            } catch (CommandException e) {
+                writer.writeError(e.getMessage(), output);
+                continue;
+            } catch (IOException e) {
+                LOG.log(System.Logger.Level.ERROR,
+                        "Command execution failed because of an I/O error", e);
+                writer.writeError("Internal server error", output);
+                continue;
+            }
+
+            writer.writeResult(result, output);
         }
     }
 }

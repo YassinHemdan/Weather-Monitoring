@@ -14,6 +14,7 @@ public class RespWriter {
 
 
     public void writeResult(CommandResult result, OutputStream output) throws IOException {
+        Objects.requireNonNull(result, "result");
         write(toRespValue(result), output);
     }
     public void write(RespValue respValue, OutputStream output) throws IOException {
