@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
+import org.example.application.port.in.IngestWeatherEventUseCase;
 import org.example.domain.weather.WeatherEvent;
 
 import java.time.Duration;
@@ -18,12 +19,18 @@ public class WeatherConsumer implements AutoCloseable {
     private final KafkaConsumer<String, WeatherEvent> consumer;
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    public WeatherConsumer(Properties properties, String topic) {
+    private final IngestWeatherEventUseCase ingestionUseCase;
+
+    public WeatherConsumer(
+            Properties properties,
+            String topic,
+            IngestWeatherEventUseCase ingestionUseCase) {
         this.consumer = new KafkaConsumer<>(properties);
         this.consumer.subscribe(Collections.singletonList(topic));
+        this.ingestionUseCase = ingestionUseCase;
     }
 
-    public void consume(EventHandler handler) {
+    public void consume() {
 
         try {
             while (running.get()) {
@@ -31,13 +38,12 @@ public class WeatherConsumer implements AutoCloseable {
                 ConsumerRecords<String, WeatherEvent> records =
                         consumer.poll(POLL_TIMEOUT);
 
-                if (records.isEmpty()) {
+                if (records.isEmpty())
                     continue;
-                }
 
-                for (ConsumerRecord<String, WeatherEvent> record : records) {
-                    handler.handle(record);
-                }
+                for (ConsumerRecord<String, WeatherEvent> record : records)
+                    ingestionUseCase.ingest(record.value());
+
                 consumer.commitSync();
             }
 

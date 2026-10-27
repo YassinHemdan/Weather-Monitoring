@@ -1,5 +1,6 @@
 package org.example.application.command;
 
+import java.io.IOException;
 import java.util.*;
 
 public final class CommandDispatcher {
@@ -16,7 +17,7 @@ public final class CommandDispatcher {
         this.handlers = Map.copyOf(registry);
     }
 
-    public CommandResult dispatch(Command command) throws CommandException{
+    public CommandResult dispatch(Command command) throws CommandException, IOException {
         Objects.requireNonNull(command);
 
         String name = normalize(command.name());

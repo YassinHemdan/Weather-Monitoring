@@ -1,5 +1,6 @@
 package org.example.application.command;
 
+import java.io.IOException;
 import java.util.List;
 
 public interface CommandHandler {
@@ -7,5 +8,5 @@ public interface CommandHandler {
 
     ArgumentCount argumentCount();
 
-    CommandResult execute(List<String> arguments) throws CommandException;
+    CommandResult execute(List<String> arguments) throws IOException;
 }

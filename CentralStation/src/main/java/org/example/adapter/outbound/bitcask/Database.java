@@ -59,12 +59,12 @@ public class Database implements AutoCloseable{
         );
     }
 
-    public List<Pair<String, Entry>> getAll() throws IOException {
-        List<Pair<String, Entry>> keyRecordslist = new ArrayList<>();
+    public Map<String, Entry>getAll() throws IOException {
+        Map<String, Entry> entries = new HashMap<>();
         for(String key : keyDir.keySet())
-            keyRecordslist.add(new Pair<>(key, get(key)));
+            entries.put(key, get(key));
 
-        return keyRecordslist;
+        return entries;
     }
     private byte[] serializeEntry(Entry entry) {
         // <timestamp><key-size><value-size><key><value>
