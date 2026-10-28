@@ -1,56 +1,84 @@
 package org.example.adapter.outbound.bitcask;
 
+import java.io.EOFException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.nio.file.*;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public class Database implements AutoCloseable{
     private final Path dbDir;
-    private final RandomAccessFile activeFile;
-    private final Map<String, Long> keyDir = new HashMap<>();
+    private final FileChannel activeFileChannel;
+    private final Map<String, Long> keyDir = new ConcurrentHashMap<>();
 
     public Database(String dbPath) throws IOException {
         this.dbDir = Paths.get(dbPath);
 
         Files.createDirectories(dbDir);
-
         Path activePath = dbDir.resolve("active.data");
-        this.activeFile = new RandomAccessFile(activePath.toFile(), "rw");
+
+        activeFileChannel = FileChannel.open(
+                activePath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        );
     }
 
-    public void set(Entry entry) throws IOException {
+    public synchronized void set(Entry entry) throws IOException {
         byte[] data = serializeEntry(entry);
+        long offset = activeFileChannel.size();
 
-        activeFile.seek(activeFile.length());
+        append(data);
 
-        keyDir.put(entry.getKey(), activeFile.length());
-
-        activeFile.write(data);
+        keyDir.put(entry.getKey(), offset);
     }
+
+
+    private void append(byte[] data) throws IOException {
+        writeAt(data, activeFileChannel.size());
+    }
+
+    private void writeAt(byte[] data, long offset) throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+
+        long position = offset;
+        while (buffer.hasRemaining()) {
+            int written = activeFileChannel.write(buffer, position);
+
+            if (written == 0) {
+                Thread.onSpinWait();
+                continue;
+            }
+
+            position += written;
+        }
+    }
+
 
     public Entry get(String key) throws IOException {
-        seek(key);
+        long offset = keyDir.get(key);
 
-        // fixed positions
-        long timestamp = activeFile.readLong();
-        int keySize = activeFile.readInt();
-        int valueSize = activeFile.readInt();
+        long timestamp = readLong(offset);
+        offset += Long.BYTES;
 
-        byte[] keyBytes = new byte[keySize];
-        byte[] valueBytes = new byte[valueSize];
+        int keySize = readInt(offset);
+        offset += Integer.BYTES;
 
-        activeFile.readFully(keyBytes);
-        activeFile.readFully(valueBytes);
+        int valueSize = readInt(offset);
+        offset += Integer.BYTES;
+
+        byte[] keyBytes = readBytes(offset, keySize);
+        offset += keySize;
+
+        byte[] valueBytes = readBytes(offset, valueSize);
 
         return new Entry(
                 timestamp,
@@ -65,6 +93,45 @@ public class Database implements AutoCloseable{
             entries.put(key, get(key));
 
         return entries;
+    }
+
+
+    private ByteBuffer read(long offset, int length) throws IOException {
+        if (offset < 0 || length < 0)
+            throw new IllegalArgumentException("Offset and length must be non-negative");
+
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        while (buffer.hasRemaining()) {
+            int bytesRead = activeFileChannel.read(buffer, offset);
+
+            if (bytesRead == -1) {
+                throw new EOFException("Not enough bytes in the file");
+            }
+
+            offset += bytesRead;
+        }
+
+        buffer.flip();
+        return buffer;
+    }
+
+    private byte[] readBytes(long offset, int length) throws IOException {
+        ByteBuffer buffer = read(offset, length);
+
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+
+        return bytes;
+    }
+    private long readLong(long offset) throws IOException {
+        return read(offset, Long.BYTES)
+                .order(ByteOrder.BIG_ENDIAN)
+                .getLong();
+    }
+    private int readInt(long offset) throws IOException {
+        return read(offset, Integer.BYTES)
+                .order(ByteOrder.BIG_ENDIAN)
+                .getInt();
     }
     private byte[] serializeEntry(Entry entry) {
         // <timestamp><key-size><value-size><key><value>
@@ -87,11 +154,8 @@ public class Database implements AutoCloseable{
                 .array();
     }
 
-    private void seek(String key) throws IOException {
-        this.activeFile.seek(this.keyDir.get(key));
-    }
     @Override
     public void close() throws IOException {
-        activeFile.close();
+        activeFileChannel.close();
     }
 }
