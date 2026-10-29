@@ -1,6 +1,5 @@
 package org.example.application.ingestion;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.example.application.port.in.IngestWeatherEventUseCase;
 import org.example.application.port.out.KeyValueWriter;
 import org.example.domain.weather.WeatherEvent;
