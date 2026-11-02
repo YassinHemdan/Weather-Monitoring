@@ -88,6 +88,8 @@ public class Segment implements AutoCloseable{
     public long size() throws IOException {
         return fileChannel.size();
     }
+
+    // TODO: I marked this segment as sealed, but the permissions itself still read/write. I should fix it
     public synchronized void seal() {
         state = State.SEALED;
     }

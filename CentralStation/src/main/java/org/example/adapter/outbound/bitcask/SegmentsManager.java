@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SegmentsManager implements AutoCloseable{
-    public static final long DEFAULT_MAX_FILE_SIZE = 1_000_000_000L;
+    public static final long DEFAULT_MAX_FILE_SIZE = 1_000_0;
 
     private volatile Segment activeSegment;
     private final Map<String, Segment> segments = new ConcurrentHashMap<>();
