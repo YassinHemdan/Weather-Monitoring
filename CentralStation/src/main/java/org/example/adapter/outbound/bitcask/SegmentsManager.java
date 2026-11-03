@@ -48,7 +48,7 @@ public class SegmentsManager implements AutoCloseable{
         return segment.read(offset, length);
     }
 
-    public synchronized EntryLocation write(byte[] data) throws IOException{
+    public synchronized long write(byte[] data) throws IOException{
         Objects.requireNonNull(data, "data");
         if (data.length > maxFileSize) {
             throw new IllegalArgumentException("Record size " + data.length
@@ -62,8 +62,7 @@ public class SegmentsManager implements AutoCloseable{
             segment = activeSegment;
         }
 
-        long offset = segment.append(data);
-        return new EntryLocation(segment.fileId(), offset, data.length);
+        return segment.append(data);
     }
 
     private void newActiveSegment() throws IOException {
@@ -88,9 +87,14 @@ public class SegmentsManager implements AutoCloseable{
             }
         }
     }
+
     private synchronized String nextId() {
         lastId = Math.max(System.currentTimeMillis(), lastId + 1);
         return Long.toString(lastId);
+    }
+
+    public String activeFileId() {
+        return this.activeSegment.fileId();
     }
 
     @Override

@@ -30,7 +30,6 @@ public class Segment implements AutoCloseable{
         );
     }
 
-
     public byte[] read(long offset, long length) throws IOException {
         if (offset < 0) {
             throw new IllegalArgumentException("Offset must be non-negative");
@@ -58,9 +57,6 @@ public class Segment implements AutoCloseable{
         return buffer.array();
     }
 
-
-
-
     public synchronized long append(byte[] data) throws IOException {
         Objects.requireNonNull(data, "data");
         if (state == State.SEALED) {
@@ -79,7 +75,7 @@ public class Segment implements AutoCloseable{
             }
             position += written;
         }
-        return startOffset;
+        return position;
     }
 
     public String fileId() {

@@ -18,14 +18,14 @@ public class BitcaskStore implements KeyValueReader, KeyValueWriter {
 
     @Override
     public Optional<String> get(String key) throws IOException {
-        return database.find(key).map(Entry::getValue);
+        return database.find(key).map(Entry::value);
     }
 
     @Override
     public Map<String, String> getAll() throws IOException {
         Map<String, String> result = new HashMap<>();
         Map<String, Entry> entries = database.getAll();
-        entries.forEach((key, entry) -> result.put(key, entry.getValue()));
+        entries.forEach((key, entry) -> result.put(key, entry.value()));
         return result;
     }
 
