@@ -1,33 +1,37 @@
-package org.example.adapter.outbound.bitcask;
+package org.example.adapter.outbound.bitcask.segment;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Segment implements AutoCloseable{
-    private enum State {
-        ACTIVE,
-        SEALED
-    }
 
     private final String fileId;
     private final FileChannel fileChannel;
-    private volatile State state = State.ACTIVE;
+    private SegmentState state;
 
-    public Segment(String fileId, Path path) throws IOException {
-        this.fileId = Objects.requireNonNull(fileId, "fileId");
-        Objects.requireNonNull(path, "path");
+    public Segment(String fileId, Path path, SegmentState state, boolean createNew) throws IOException {
+        this.fileId = Objects.requireNonNull(fileId, "file_id");
+        this.state = Objects.requireNonNull(state, "segment_state");
+        this.fileChannel = getFileChannel(path, createNew);
+    }
 
-        this.fileChannel = FileChannel.open(
-                path,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE
-        );
+    private FileChannel getFileChannel(Path path, boolean isNew) throws IOException {
+        List<OpenOption> options = new ArrayList<>();
+        options.add(StandardOpenOption.READ);
+        options.add(StandardOpenOption.WRITE);
+
+        if (isNew)
+            options.add(StandardOpenOption.CREATE_NEW);
+
+        return FileChannel.open(path, options.toArray(new OpenOption[0]));
     }
 
     public byte[] read(long offset, long length) throws IOException {
@@ -59,7 +63,7 @@ public class Segment implements AutoCloseable{
 
     public synchronized long append(byte[] data) throws IOException {
         Objects.requireNonNull(data, "data");
-        if (state == State.SEALED) {
+        if (state == SegmentState.SEALED) {
             throw new IllegalStateException("Cannot append to sealed segment " + fileId);
         }
 
@@ -81,13 +85,14 @@ public class Segment implements AutoCloseable{
     public String fileId() {
         return this.fileId;
     }
+
     public long size() throws IOException {
         return fileChannel.size();
     }
 
-    // TODO: I marked this segment as sealed, but the permissions itself still read/write. I should fix it
-    public synchronized void seal() {
-        state = State.SEALED;
+    // The file will be logically immutable, but the actual permissions of the file still read/write
+    public synchronized void seal() throws IOException {
+        state = SegmentState.SEALED;
     }
 
     @Override

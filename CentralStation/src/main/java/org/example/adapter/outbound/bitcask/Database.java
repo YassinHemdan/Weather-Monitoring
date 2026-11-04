@@ -1,14 +1,17 @@
 package org.example.adapter.outbound.bitcask;
 
+import org.example.adapter.outbound.bitcask.segment.RecoveredEntry;
+import org.example.adapter.outbound.bitcask.segment.Segment;
+import org.example.adapter.outbound.bitcask.segment.SegmentRecoverer;
+import org.example.adapter.outbound.bitcask.segment.SegmentsManager;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 
 
 public class Database implements AutoCloseable{
@@ -27,12 +30,35 @@ public class Database implements AutoCloseable{
     public Database(String dbPath, long maxSegmentSize) throws IOException {
         Path dbDir = Paths.get(Objects.requireNonNull(dbPath, "dbPath"));
         this.segmentsManager = new SegmentsManager(dbDir, maxSegmentSize);
+
+        recover();
     }
+
+    // we get the segments from our SegmentManager, and we recover our KeyDir from it.
+    // We don't make the SegmentManager to recover the KeyDir for us, as the SegmentManager don't know how our entries are stored.
+    // TODO: For now, we didn't use/implement any hint files yet.
+    private void recover() throws IOException {
+        List<Segment> segments = this.segmentsManager.getSegments();
+        for (Segment segment : segments)
+            recoverSegment(segment);
+    }
+
+    private void recoverSegment(Segment segment) throws IOException {
+        SegmentRecoverer recoverer = new SegmentRecoverer(segment);
+
+        // the segments were ordered by the fileId
+        // so whenever we get a value, we can update the keyDir without checking any old values
+        while (recoverer.hasNext()) {
+            RecoveredEntry recoveredEntry = recoverer.get();
+            keyDir.put(recoveredEntry.key(), recoveredEntry.location());
+        }
+    }
+
 
 
     public synchronized void set(Entry entry) throws IOException {
         Objects.requireNonNull(entry, "entry");
-        String key = Objects.requireNonNull(entry.value(), "entry.key");
+        String key = Objects.requireNonNull(entry.key(), "entry.key");
         Objects.requireNonNull(entry.value(), "entry.value");
 
         SerializedEntry serialized = serializeEntry(entry);

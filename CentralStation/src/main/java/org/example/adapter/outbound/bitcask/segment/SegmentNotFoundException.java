@@ -1,4 +1,4 @@
-package org.example.adapter.outbound.bitcask;
+package org.example.adapter.outbound.bitcask.segment;
 
 import java.io.IOException;
 
