@@ -6,106 +6,121 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class DatabaseReadWriteConcurrencyTest {
 
     private static final String KEY = "station-42";
-    private static final int WRITER_UPDATES = 2_000;
+
+    private static final int WRITER_UPDATES = 2000;
     private static final int READER_COUNT = 4;
-    private static final int MIN_READS_PER_READER = 2_000;
-    private static final long TASK_TIMEOUT_SECONDS = 30;
+    private static final int MIN_READS_PER_READER = 2000;
+
+    private static final int TIMEOUT_SECONDS = 30;
 
     @TempDir
     Path tempDir;
 
     @Test
-    void readersOnlyObserveCompleteValuesWhileWriterUpdatesSameKey() throws Exception {
-        Path databaseDirectory = tempDir.resolve("db");
+    void readersShouldOnlyObserveCompleteRecords() throws Exception {
 
-        try (Database database = new Database(databaseDirectory.toString())) {
-            String initialValue = payload(0);
-            database.set(new Entry(0L, KEY, initialValue));
+        try (Database database =
+                     new Database(tempDir.toString(), 4096)) {
 
-            Set<String> allowedValues = java.util.concurrent.ConcurrentHashMap.newKeySet();
-            allowedValues.add(initialValue);
-            List<String> valuesToWrite = IntStream.rangeClosed(1, WRITER_UPDATES)
-                    .mapToObj(DatabaseReadWriteConcurrencyTest::payload)
-                    .toList();
-            allowedValues.addAll(valuesToWrite);
+            database.set(new Entry(0, KEY, "value-0"));
 
-            CountDownLatch startTogether = new CountDownLatch(1);
-            AtomicBoolean writerFinished = new AtomicBoolean(false);
-            AtomicInteger totalReads = new AtomicInteger();
-            ExecutorService executor = Executors.newFixedThreadPool(READER_COUNT + 1);
-            List<Future<?>> futures = new ArrayList<>();
+            ExecutorService executor =
+                    Executors.newFixedThreadPool(READER_COUNT + 1);
+
+            CountDownLatch startSignal = new CountDownLatch(1);
+
+            AtomicBoolean writerDone = new AtomicBoolean(false);
 
             try {
-                for (int readerNumber = 0; readerNumber < READER_COUNT; readerNumber++) {
-                    futures.add(executor.submit(() -> {
-                        startTogether.await();
+                Future<?> writer = executor.submit(() -> {
 
-                        int readsPerformed = 0;
-                        while (!writerFinished.get()
-                                || readsPerformed < MIN_READS_PER_READER) {
+                    startSignal.await();
 
-                            Entry result = database.get(KEY);
-
-                            assertEquals(KEY, result.key(),
-                                    "A read returned the wrong key; the record may have been corrupted.");
-                            assertTrue(allowedValues.contains(result.value()),
-                                    () -> "A reader observed a value that was never written completely: "
-                                            + result.value());
-
-                            readsPerformed++;
-                            totalReads.incrementAndGet();
-                        }
-                        return null;
-                    }));
-                }
-                futures.add(executor.submit(() -> {
-                    startTogether.await();
                     try {
-                        long timestamp = 1L;
-                        for (String value : valuesToWrite) {
-                            database.set(new Entry(timestamp++, KEY, value));
+                        for (int i = 1; i <= WRITER_UPDATES; i++) {
+                            database.set(
+                                    new Entry(i, KEY, "value-" + i)
+                            );
                         }
                     } finally {
-                        writerFinished.set(true);
+                        writerDone.set(true);
                     }
+
                     return null;
-                }));
+                });
 
-                startTogether.countDown();
+                List<Future<?>> readers = new ArrayList<>();
 
-                for (Future<?> future : futures) {
-                    future.get(TASK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                for (int i = 0; i < READER_COUNT; i++) {
+
+                    Future<?> reader = executor.submit(() -> {
+
+                        startSignal.await();
+
+                        int reads = 0;
+
+                        while (!writerDone.get()
+                                || reads < MIN_READS_PER_READER) {
+
+                            Entry entry = database.find(KEY)
+                                    .orElseThrow();
+
+                            assertEquals(KEY, entry.key());
+
+                            assertTrue(
+                                    entry.value().matches("value-\\d+")
+                            );
+
+                            long valueVersion = Long.parseLong(
+                                    entry.value().substring("value-".length())
+                            );
+
+                            assertEquals(
+                                    valueVersion,
+                                    entry.timestamp(),
+                                    "Timestamp and value must belong to the same record"
+                            );
+
+                            reads++;
+                        }
+
+                        return null;
+                    });
+
+                    readers.add(reader);
                 }
 
-                assertTrue(totalReads.get() >= READER_COUNT * MIN_READS_PER_READER,
-                        "Readers did not perform the expected number of reads.");
+                startSignal.countDown();
 
-                assertEquals(payload(WRITER_UPDATES), database.get(KEY).value());
+                writer.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+                for (Future<?> reader : readers) {
+                    reader.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                }
+
+                Entry finalEntry = database.get(KEY);
+
+                assertEquals(
+                        WRITER_UPDATES,
+                        finalEntry.timestamp()
+                );
+
+                assertEquals(
+                        "value-" + WRITER_UPDATES,
+                        finalEntry.value()
+                );
+
             } finally {
                 executor.shutdownNow();
             }
         }
-    }
-
-    private static String payload(int version) {
-        return "version=" + version
-                + "|body=" + "x".repeat((version % 127) + 1)
-                + "|end=" + version;
     }
 }

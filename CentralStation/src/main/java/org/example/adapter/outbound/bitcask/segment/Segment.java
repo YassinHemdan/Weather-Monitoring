@@ -79,7 +79,7 @@ public class Segment implements AutoCloseable{
             }
             position += written;
         }
-        return position;
+        return startOffset;
     }
 
     public String fileId() {
@@ -95,6 +95,9 @@ public class Segment implements AutoCloseable{
         state = SegmentState.SEALED;
     }
 
+    public SegmentState getState() {
+        return state;
+    }
     @Override
     public void close() throws IOException {
         fileChannel.close();

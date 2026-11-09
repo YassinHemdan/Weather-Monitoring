@@ -103,7 +103,7 @@ public class SegmentsManager implements AutoCloseable{
         return segment.read(offset, length);
     }
 
-    public synchronized long write(byte[] data) throws IOException{
+    public synchronized AppendResult append(byte[] data) throws IOException{
         Objects.requireNonNull(data, "data");
         if (data.length > maxFileSize) {
             throw new IllegalArgumentException("Record size " + data.length
@@ -117,7 +117,11 @@ public class SegmentsManager implements AutoCloseable{
             segment = activeSegment; // new active segment created
         }
 
-        return segment.append(data);
+        return new AppendResult(
+                segment.fileId(),
+                segment.append(data),
+                segment.size()
+        );
     }
 
 
@@ -143,7 +147,6 @@ public class SegmentsManager implements AutoCloseable{
         }
     }
 
-    // Opens an existed  segment, registers it in our manager, then returns it
     private Segment openSegment(String id, SegmentState state) throws IOException {
         Path segmentPath = dbDir.resolve(id + ".data");
         Segment segment = new Segment(id, segmentPath, state, false);
@@ -162,13 +165,22 @@ public class SegmentsManager implements AutoCloseable{
         return this.activeSegment.fileId();
     }
 
-    public List<Segment> getSegments() {
-        return segments.values()
-                .stream()
-                .sorted(Comparator.comparingLong(
-                        segment -> Long.parseLong(segment.fileId())
-                ))
-                .toList();
+    public List<SegmentInfo> getSegments() throws IOException {
+        List<SegmentInfo> result = new ArrayList<>(segments.size());
+
+        for (Segment segment : segments.values()) {
+            result.add(new SegmentInfo(
+                    segment.fileId(),
+                    segment.size(),
+                    segment.getState()
+            ));
+        }
+
+        result.sort(
+                Comparator.comparingLong(info -> Long.parseLong(info.id()))
+        );
+
+        return result;
     }
 
     @Override
